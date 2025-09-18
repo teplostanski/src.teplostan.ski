@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel='icon' type='image/svg+xml' href='/favicon.svg' />
+    <title>src</title>
+    <style>
+      .list {
+        font-family: monospace;
+        padding-left: 20px;
+      }
+      .list__item {
+        position: relative;
+        margin: 5px 0;
+      }
+      .link {
+        position: relative;
+        padding-left: 1.3em;
+        text-decoration: none;
+        cursor: pointer;
+        display: inline-block;
+      }
+
+      .file.type::before {
+        content: '📄';
+        position: absolute;
+        left: 0;
+      }
+
+      .folder.type::before {
+        content: '📁';
+        position: absolute;
+        left: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>src</h1>
+    <div id="structure"></div>
+
+    <script>
+      const repoOwner = 'teplostanski';
+      const repoName = 'src.teplostan.ski';
+
+      async function fetchRepoContents(path = '') {
+        const url = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Error: ${response.status}`);
+        }
+        return response.json();
+      }
+
+      function createFileElement(file, basePath = '') {
+        const li = document.createElement('li');
+        li.classList.add('list__item');
+
+        const relativePath = basePath ? basePath + '/' + file.name : file.name;
+        const a = document.createElement('a');
+        a.classList.add('link', 'type');
+
+        if (file.type === 'dir') {
+          a.classList.add('folder');
+          a.href = 'javascript:void(0)';
+          a.textContent = file.name;
+          a.addEventListener('click', async () => {
+            const existingUl = li.querySelector('ul');
+            if (existingUl) {
+              li.removeChild(existingUl);
+            } else {
+              const children = await fetchRepoContents(relativePath);
+              const ul = document.createElement('ul');
+              ul.classList.add('list');
+              children.forEach((child) => {
+                ul.appendChild(createFileElement(child, relativePath));
+              });
+              li.appendChild(ul);
+            }
+          });
+        } else {
+          a.classList.add('file');
+          a.href = '/' + relativePath;
+          a.textContent = file.name;
+        }
+
+        li.appendChild(a);
+        return li;
+      }
+
+      async function buildStructure() {
+        try {
+          const rootContents = await fetchRepoContents();
+          const container = document.getElementById('structure');
+          const ul = document.createElement('ul');
+          ul.classList.add('list');
+          rootContents.forEach((file) =>
+            ul.appendChild(createFileElement(file))
+          );
+          container.appendChild(ul);
+        } catch (error) {
+          console.error(error);
+          document.getElementById('structure').textContent =
+            'Structure loading error';
+        }
+      }
+
+      buildStructure();
+    </script>
+  </body>
+</html>
