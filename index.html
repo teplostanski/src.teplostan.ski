@@ -1,110 +1,142 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="UTF-8" />
-    <link rel='icon' type='image/svg+xml' href='/favicon.svg' />
-    <title>src</title>
-    <style>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width">
+  <link rel='icon' type='image/svg+xml' href='/favicon.svg' />
+  <title>src</title>
+  <style>
+    .list {
+      font-family: monospace, monospace;
+      font-size: 16px;
+      padding-left: 1em;
+      max-width: 100%;
+      overflow-wrap: break-word;
+    }
+
+    .list__item {
+      margin: 0.3em 0;
+      position: relative;
+      white-space: nowrap;
+    }
+
+    .link {
+      padding: 3px;
+      text-decoration: none;
+      cursor: pointer;
+      display: inline-flex;
+      white-space: normal;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file.type::before {
+      content: '📄';
+      position: relative;
+      margin-right: 0.3em;
+      font-size: 1em;
+      vertical-align: middle;
+    }
+
+    .folder.type::before {
+      content: '📁';
+      position: relative;
+      margin-right: 0.3em;
+      font-size: 1em;
+      vertical-align: middle;
+    }
+
+    .list ul.list {
+      padding-left: 1.5em;
+      margin-top: 0.2em;
+    }
+
+    @media (max-width: 480px) {
       .list {
-        font-family: monospace;
-        padding-left: 20px;
+        font-size: 14px;
       }
-      .list__item {
-        position: relative;
-        margin: 5px 0;
-      }
+
       .link {
-        position: relative;
-        padding-left: 1.3em;
-        text-decoration: none;
-        cursor: pointer;
-        display: inline-block;
+        white-space: normal;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <h1>src</h1>
+  <div id="structure"></div>
+
+  <script>
+    const repoOwner = 'teplostanski';
+    const repoName = 'src.teplostan.ski';
+
+    async function fetchRepoContents(path = '') {
+      const url = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status}`);
+      }
+      return response.json();
+    }
+
+    function createFileElement(file, basePath = '') {
+      const li = document.createElement('li');
+      li.classList.add('list__item');
+
+      const relativePath = basePath ? basePath + '/' + file.name : file.name;
+      const a = document.createElement('a');
+      a.classList.add('link', 'type');
+
+      if (file.type === 'dir') {
+        a.classList.add('folder');
+        a.href = 'javascript:void(0)';
+        a.textContent = file.name;
+        a.addEventListener('click', async () => {
+          const existingUl = li.querySelector('ul');
+          if (existingUl) {
+            li.removeChild(existingUl);
+          } else {
+            const children = await fetchRepoContents(relativePath);
+            const ul = document.createElement('ul');
+            ul.classList.add('list');
+            children.forEach((child) => {
+              ul.appendChild(createFileElement(child, relativePath));
+            });
+            li.appendChild(ul);
+          }
+        });
+      } else {
+        a.classList.add('file');
+        a.href = '/' + relativePath;
+        a.textContent = file.name;
       }
 
-      .file.type::before {
-        content: '📄';
-        position: absolute;
-        left: 0;
+      li.appendChild(a);
+      return li;
+    }
+
+    async function buildStructure() {
+      try {
+        const rootContents = await fetchRepoContents();
+        const container = document.getElementById('structure');
+        const ul = document.createElement('ul');
+        ul.classList.add('list');
+        rootContents.forEach((file) =>
+          ul.appendChild(createFileElement(file))
+        );
+        container.appendChild(ul);
+      } catch (error) {
+        console.error(error);
+        document.getElementById('structure').textContent =
+          'Structure loading error';
       }
+    }
 
-      .folder.type::before {
-        content: '📁';
-        position: absolute;
-        left: 0;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>src</h1>
-    <div id="structure"></div>
+    buildStructure();
+  </script>
+</body>
 
-    <script>
-      const repoOwner = 'teplostanski';
-      const repoName = 'src.teplostan.ski';
-
-      async function fetchRepoContents(path = '') {
-        const url = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}`;
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Error: ${response.status}`);
-        }
-        return response.json();
-      }
-
-      function createFileElement(file, basePath = '') {
-        const li = document.createElement('li');
-        li.classList.add('list__item');
-
-        const relativePath = basePath ? basePath + '/' + file.name : file.name;
-        const a = document.createElement('a');
-        a.classList.add('link', 'type');
-
-        if (file.type === 'dir') {
-          a.classList.add('folder');
-          a.href = 'javascript:void(0)';
-          a.textContent = file.name;
-          a.addEventListener('click', async () => {
-            const existingUl = li.querySelector('ul');
-            if (existingUl) {
-              li.removeChild(existingUl);
-            } else {
-              const children = await fetchRepoContents(relativePath);
-              const ul = document.createElement('ul');
-              ul.classList.add('list');
-              children.forEach((child) => {
-                ul.appendChild(createFileElement(child, relativePath));
-              });
-              li.appendChild(ul);
-            }
-          });
-        } else {
-          a.classList.add('file');
-          a.href = '/' + relativePath;
-          a.textContent = file.name;
-        }
-
-        li.appendChild(a);
-        return li;
-      }
-
-      async function buildStructure() {
-        try {
-          const rootContents = await fetchRepoContents();
-          const container = document.getElementById('structure');
-          const ul = document.createElement('ul');
-          ul.classList.add('list');
-          rootContents.forEach((file) =>
-            ul.appendChild(createFileElement(file))
-          );
-          container.appendChild(ul);
-        } catch (error) {
-          console.error(error);
-          document.getElementById('structure').textContent =
-            'Structure loading error';
-        }
-      }
-
-      buildStructure();
-    </script>
-  </body>
 </html>
